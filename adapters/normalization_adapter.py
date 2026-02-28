@@ -6,7 +6,7 @@ import torch
 from typing import List, Tuple
 import sys
 sys.path.append('/root/.openclaw/workspace')
-from operator_test_framework.core.adapter import OperatorTestAdapter
+from core.adapter import OperatorTestAdapter
 
 
 class LayerNormAdapter(OperatorTestAdapter):

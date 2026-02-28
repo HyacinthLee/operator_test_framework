@@ -4,10 +4,10 @@ Attention operator adapter for testing.
 
 import torch
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import sys
 sys.path.append('/root/.openclaw/workspace')
-from operator_test_framework.core.adapter import OperatorTestAdapter
+from core.adapter import OperatorTestAdapter
 
 
 class AttentionAdapter(OperatorTestAdapter):

@@ -13,11 +13,11 @@ A unified testing framework for deep learning operators, supporting correctness 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/operator-test-framework.git
-cd operator-test-framework
+git clone https://github.com/HyacinthLee/operator_test_framework.git
+cd operator_test_framework
 
 # Install dependencies
-pip install torch pytest
+pip install -r requirements.txt
 
 # Optional: Install for flash attention testing
 pip install flash-attn

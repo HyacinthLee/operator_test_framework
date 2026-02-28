@@ -51,7 +51,7 @@ class TransformerEngineLinearAdapter(OperatorTestAdapter):
         elif fp8_format == "HYBRID":
             fp8_format_enum = recipe.Format.HYBRID
         else:
-            fp8_format_enum = recipe.Format.E4M3
+            raise ValueError(f"Invalid fp8_format: {fp8_format}. Must be 'E4M3' or 'HYBRID'")
         
         self.fp8_recipe = recipe.DelayedScaling(
             margin=0,
@@ -234,6 +234,8 @@ class TransformerEngineTransformerLayerAdapter(OperatorTestAdapter):
     ):
         super().__init__("TE_TransformerLayer", "transformer_engine")
         self.hidden_size = hidden_size
+        self.num_attention_heads = num_attention_heads
+        self.ffn_hidden_size = ffn_hidden_size
         self.device = device
         
         if not TE_AVAILABLE:
@@ -258,11 +260,19 @@ class TransformerEngineTransformerLayerAdapter(OperatorTestAdapter):
     def reference_implementation(self, x: torch.Tensor) -> torch.Tensor:
         """
         Reference: PyTorch native TransformerEncoderLayer.
-        Note: This is approximate as TE uses custom implementation.
         """
-        # For end-to-end testing, we mainly check output properties
-        # rather than exact numerical match
-        return x  # Placeholder
+        # Create a reference transformer layer
+        if not hasattr(self, '_ref_module'):
+            self._ref_module = torch.nn.TransformerEncoderLayer(
+                d_model=self.hidden_size,
+                nhead=self.num_attention_heads,
+                dim_feedforward=self.ffn_hidden_size,
+                batch_first=True
+            ).to(self.device)
+            self._ref_module.eval()
+        
+        with torch.no_grad():
+            return self._ref_module(x.float())
     
     def test_implementation(self, x: torch.Tensor) -> torch.Tensor:
         """Test: TE TransformerLayer."""

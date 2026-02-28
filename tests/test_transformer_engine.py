@@ -43,18 +43,21 @@ class TestTransformerEngineLinear:
         
         # Test with different input magnitudes
         test_cases = [
-            torch.randn(16, 1024, device='cuda'),  # Normal
-            torch.randn(16, 1024, device='cuda') * 0.01,  # Small
-            torch.randn(16, 1024, device='cuda') * 100,  # Large
+            ("normal", torch.randn(16, 1024, device='cuda')),
+            ("small", torch.randn(16, 1024, device='cuda') * 0.01),
+            ("large", torch.randn(16, 1024, device='cuda') * 100),
+            ("very_small", torch.randn(16, 1024, device='cuda') * 1e-4),
+            ("very_large", torch.randn(16, 1024, device='cuda') * 1e4),
+            ("mixed", torch.randn(16, 1024, device='cuda') * torch.randn(16, 1024, device='cuda').sign() * 10),
         ]
         
-        for x in test_cases:
+        for name, x in test_cases:
             out_te = adapter.test_implementation(x)
             out_ref = adapter.reference_implementation(x)
             
             # FP8 allows larger error than FP16
-            rel_error = (out_te.float() - out_ref).abs().mean() / out_ref.abs().mean()
-            assert rel_error < 0.05, f"Relative error too large: {rel_error}"
+            rel_error = (out_te.float() - out_ref).abs().mean() / (out_ref.abs().mean() + 1e-8)
+            assert rel_error < 0.05, f"[{name}] Relative error too large: {rel_error}"
     
     def test_te_linear_gradient_stability(self):
         """Test gradient stability in FP8 training."""
@@ -64,6 +67,13 @@ class TestTransformerEngineLinear:
         )
         
         adapter = TransformerEngineLinearAdapter(1024, 4096)
+        
+        # Clear any existing gradients
+        if hasattr(adapter.te_module, 'weight') and adapter.te_module.weight.grad is not None:
+            adapter.te_module.weight.grad.zero_()
+        if hasattr(adapter.te_module, 'bias') and adapter.te_module.bias.grad is not None:
+            adapter.te_module.bias.grad.zero_()
+        
         x = torch.randn(16, 1024, device='cuda', requires_grad=True)
         
         # Forward + backward
@@ -82,6 +92,13 @@ class TestTransformerEngineLinear:
         
         # Allow some underflow in FP8, but not too much
         assert grad_stats['underflow_ratio'] < 0.7, f"Too much underflow: {grad_stats['underflow_ratio']}"
+        
+        # Cleanup gradients
+        x.grad.zero_()
+        if hasattr(adapter.te_module, 'weight') and adapter.te_module.weight.grad is not None:
+            adapter.te_module.weight.grad.zero_()
+        if hasattr(adapter.te_module, 'bias') and adapter.te_module.bias.grad is not None:
+            adapter.te_module.bias.grad.zero_()
     
     def test_te_linear_memory_efficiency(self):
         """Test TE Linear memory efficiency."""
@@ -288,6 +305,66 @@ class TestTransformerEngineInfo:
         """Test TE availability check."""
         available = check_te_availability()
         assert available, "Transformer Engine should be available for these tests"
+
+
+class TestTransformerEngineEdgeCases:
+    """Edge case and boundary condition tests."""
+    
+    def test_te_linear_empty_batch(self):
+        """Test TE Linear with empty batch dimension."""
+        adapter = TransformerEngineLinearAdapter(768, 3072)
+        
+        # Empty batch (should handle gracefully)
+        x = torch.randn(0, 768, device='cuda')
+        out = adapter.test_implementation(x)
+        
+        assert out.shape == (0, 3072), f"Unexpected output shape: {out.shape}"
+        assert torch.isfinite(out).all(), "Non-finite values in empty batch output"
+    
+    def test_te_linear_single_element(self):
+        """Test TE Linear with single element."""
+        adapter = TransformerEngineLinearAdapter(768, 3072)
+        
+        x = torch.randn(1, 1, 768, device='cuda')
+        out = adapter.test_implementation(x)
+        
+        assert out.shape == (1, 1, 3072), f"Unexpected output shape: {out.shape}"
+        assert torch.isfinite(out).all(), "Non-finite values in single element output"
+    
+    def test_te_linear_large_dimensions(self):
+        """Test TE Linear with large dimensions (stress test)."""
+        adapter = TransformerEngineLinearAdapter(4096, 16384)
+        
+        # Large batch and sequence
+        x = torch.randn(32, 2048, 4096, device='cuda')
+        
+        try:
+            out = adapter.test_implementation(x)
+            assert out.shape == (32, 2048, 16384), f"Unexpected output shape: {out.shape}"
+            assert torch.isfinite(out).all(), "Non-finite values in large dimension output"
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower():
+                pytest.skip("OOM - insufficient GPU memory for large dimension test")
+            raise
+    
+    def test_te_layernorm_near_zero_input(self):
+        """Test TE LayerNorm with near-zero input."""
+        adapter = TransformerEngineLayerNormAdapter(768)
+        
+        # Near-zero input
+        x = torch.ones(16, 128, 768, device='cuda') * 1e-8
+        out = adapter.test_implementation(x)
+        
+        assert torch.isfinite(out).all(), "Non-finite values with near-zero input"
+        # Should not produce NaN even with tiny variance
+        assert not torch.isnan(out).any(), "NaN produced with near-zero input"
+    
+    def test_te_invalid_fp8_format(self):
+        """Test TE with invalid FP8 format."""
+        with pytest.raises(ValueError) as exc_info:
+            TransformerEngineLinearAdapter(768, 3072, fp8_format="INVALID")
+        
+        assert "Invalid fp8_format" in str(exc_info.value)
 
 
 if __name__ == "__main__":

@@ -258,22 +258,6 @@ class TestMegatronMixedPrecision:
         
         # Attention may have larger FP16 error due to softmax
         assert result['max_rel_error'] < 0.1, f"Attention FP16 error: {result['max_rel_error']}"
-    
-    def test_attention_fp16_stability(self):
-        """Test Attention with FP16."""
-        tester = MixedPrecisionTester(rtol=1e-2, atol=1e-3)
-        
-        adapter = MegatronAttentionAdapter(768, 12)
-        x = torch.randn(4, 128, 768)
-        
-        result = tester.test_numerical_equivalence(
-            adapter.test_implementation,
-            (x,),
-            dtype=torch.float16
-        )
-        
-        # Attention may have larger FP16 error due to softmax
-        assert result['max_rel_error'] < 0.1, f"Attention FP16 error: {result['max_rel_error']}"
 
 
 if __name__ == "__main__":

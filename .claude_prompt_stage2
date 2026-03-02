@@ -1,0 +1,32 @@
+# 阶段 2: 实现核心模块
+
+基于 Kimi Code 设计的架构，实现以下核心模块：
+
+## 需要实现的文件
+
+1. core/operator_spec.py
+   - OperatorSpec 类
+   - TensorConstraint 类
+   - Attribute 类
+
+2. core/constraint.py
+   - ShapeConstraint
+   - DTypeConstraint
+   - DeviceConstraint
+
+3. core/test_case.py
+   - TestCase 类
+   - TestResult 类
+
+4. core/test_oracle.py
+   - NumericalOracle
+   - PropertyOracle
+   - GradientOracle
+
+## 要求
+1. 完整的类型注解
+2. 详细的文档字符串
+3. 遵循 PEP 8
+4. 每个类都要有 __repr__ 方法
+
+请开始实现。

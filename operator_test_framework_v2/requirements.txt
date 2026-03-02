@@ -1,0 +1,26 @@
+# Core dependencies
+torch>=2.0.0
+numpy>=1.24.0
+typing_extensions>=4.0.0
+
+# LLM clients (optional)
+openai>=1.0.0
+anthropic>=0.18.0
+
+# Symbolic execution (optional)
+z3-solver>=4.12.0
+
+# Testing
+pytest>=7.0.0
+pytest-benchmark>=4.0.0
+hypothesis>=6.0.0
+
+# Type checking
+mypy>=1.0.0
+
+# Documentation
+sphinx>=5.0.0
+
+# Utilities
+pyyaml>=6.0.0
+tqdm>=4.65.0
